@@ -103,9 +103,7 @@ export function tilesToPolygons(rows: Tile[][]) {
     }
     while (topTiles.length > 0 && bottomTiles.length > 0) {
       if (topTiles[0].collides(bottomTiles[0])) {
-        const top = topTiles[0];
-        const bottom = bottomTiles[0];
-        const result = top.merge(pointGroupRoots, bottom);
+        const result = topTiles[0].merge(pointGroupRoots, bottomTiles[0]);
         if (result === undefined) {
           bottomTiles.shift();
         }
