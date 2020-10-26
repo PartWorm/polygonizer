@@ -50,10 +50,6 @@ class TopTile {
   }
 
   merge(pointGroupRoots: Set<PointGroup>, t: BottomTile) {
-    console.log('Merging');
-    traverse(this.begin);
-    console.log('With');
-    traverse(t.begin);
     this.begin.next = t.begin;
     t.end.next = this.end;
     if (this.begin.group.root() == t.begin.group.root()) {
@@ -71,10 +67,6 @@ class TopTile {
       this.end = this.begin;
       this.begin = t.begin;
     }
-    console.log('Becaming');
-    traverse(this.begin);
-    console.log('Merge end');
-    console.log('');
     return result;
   }
 }
@@ -247,10 +239,11 @@ tilesToPolygons([
 
 tilesToPolygons(toTiles([
   ' # #'
-, '### #'
+, '#####'
 , '# # #'
 , '# # #'
-, '### #'
+, '## ##'
+, ' # #'
 ])).forEach(traverse);
 
 /*
