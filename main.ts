@@ -31,10 +31,6 @@ class Point {
 
   constructor(public group: PointGroup, public x: number, public y: number, public next?: Point) {}
 
-  eq(p: Point) {
-    return this.x == p.x && this.y == p.y;
-  }
-
   fork(groupRoots: Set<PointGroup>) {
     const group = new PointGroup(groupRoots, this);
     let here: Point = this;
@@ -45,28 +41,19 @@ class Point {
   }
 }
 
-abstract class AnyTile {
+class TopTile {
 
-  half: 'top' | 'bottom';
-  begin: Point;
-  end: Point;
+  constructor(public begin: Point, public end: Point) {}
 
-  collides(t: AnyTile) {
+  collides(t: BottomTile) {
     return t.end.x < this.begin.x && t.begin.x > this.end.x;
   }
 
-  merge(pointGroupRoots: Set<PointGroup>, t: AnyTile) {
-    if (this.half == t.half) {
-      throw 'Cannot merge same half tile';
-    }
-    if (this.half == 'bottom') {
-      throw 'Invoked merge from bottom';
-    }
+  merge(pointGroupRoots: Set<PointGroup>, t: BottomTile) {
     console.log('Merging');
     traverse(this.begin);
     console.log('With');
     traverse(t.begin);
-    this.half = this.begin.x > t.begin.x ? 'top' : 'bottom';
     this.begin.next = t.begin;
     t.end.next = this.end;
     if (this.begin.group.root() == t.begin.group.root()) {
@@ -75,10 +62,12 @@ abstract class AnyTile {
     else {
       PointGroup.merge(this.begin.group, t.begin.group);
     }
+    let result: BottomTile;
     if (this.begin.x > t.begin.x) {
       this.end = t.begin;
     }
     else if (this.begin.x < t.begin.x) {
+      result = new BottomTile(t.begin, this.begin);
       this.end = this.begin;
       this.begin = t.begin;
     }
@@ -86,40 +75,38 @@ abstract class AnyTile {
     traverse(this.begin);
     console.log('Merge end');
     console.log('');
+    return result;
   }
 }
 
-function BottomTile(groupRoots: Set<PointGroup>, y: number, beginX: number, endX: number): AnyTile {
+class BottomTile {
+
+  constructor(public begin: Point, public end: Point) {}
+
+  toTopTile() {
+    return new TopTile(this.begin.next, this.begin.next.next);
+  }
+}
+
+function createBottomTile(groupRoots: Set<PointGroup>, y: number, beginX: number, endX: number): BottomTile {
   const group = new PointGroup(groupRoots, null);
   const begin = new Point(group, endX, y);
   const end = new Point(group, beginX, y);
   group.anyPoint = begin;
   end.next = begin;
   begin.next = new Point(group, endX, y + 1, new Point(group, beginX, y + 1, end));
-  return new class extends AnyTile {
-    half = 'bottom' as 'bottom';
-    begin = begin;
-    end = end;
-  };
-}
-
-function toTopTile(t: AnyTile) {
-  return new class extends AnyTile {
-    half = 'top' as 'top';
-    begin = t.begin.next;
-    end = t.begin.next.next;
-  };
+  return new BottomTile(begin, end);
 }
 
 function tilesToPolygons(rows: Tile[][]) {
   const pointGroupRoots = new Set<PointGroup>();
-  let topTiles: AnyTile[] = [];
+  let topTiles: TopTile[] = [];
   let y = -1;
   for (const row of rows) {
-    const nextTopTiles: AnyTile[] = [];
-    const bottomTiles: AnyTile[] = [];
+    const nextTopTiles: BottomTile[] = [];
+    const bottomTiles: BottomTile[] = [];
     for (const tile of row) {
-      const t = BottomTile(pointGroupRoots, y + 1, tile.beginX, tile.endX);
+      const t = createBottomTile(pointGroupRoots, y + 1, tile.beginX, tile.endX);
       bottomTiles.push(t);
       nextTopTiles.push(t);
     }
@@ -127,13 +114,13 @@ function tilesToPolygons(rows: Tile[][]) {
       if (topTiles[0].collides(bottomTiles[0])) {
         const top = topTiles[0];
         const bottom = bottomTiles[0];
-        top.merge(pointGroupRoots, bottom);
-        if (top.half == 'top') {
+        const result = top.merge(pointGroupRoots, bottom);
+        if (result === undefined) {
           bottomTiles.shift();
         }
         else {
           topTiles.shift();
-          bottomTiles[0] = top;
+          bottomTiles[0] = result;
         }
       }
       else if (topTiles[0].end.x < bottomTiles[0].end.x) {
@@ -143,7 +130,7 @@ function tilesToPolygons(rows: Tile[][]) {
         bottomTiles.shift();
       }
     }
-    topTiles = [...nextTopTiles.map(toTopTile)].sort((a, b) => a.end.x - b.end.x);
+    topTiles = [...nextTopTiles.map(t => t.toTopTile())].sort((a, b) => a.end.x - b.end.x);
     ++y;
   }
   return Array.from(pointGroupRoots).map(g => g.anyPoint);
@@ -209,7 +196,6 @@ function traverse(p: Point) {
   let maxY = Number.MIN_SAFE_INTEGER;
   const arr = [];
   do {
-    //console.log(`${p.x}, ${p.y} -> `);
     arr[p.y] = arr[p.y] || [];
     arr[p.y][p.x] = true;
     minY = Math.min(p.y, minY);
