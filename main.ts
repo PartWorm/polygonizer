@@ -3,7 +3,7 @@ import { traverse } from './traverse';
 
 function toTiles(image: string[]) {
   const tiles: Tile[][] = [];
-  for (let imageRow of image) {
+  for (const imageRow of image) {
     const row = [];
     let prevX: number;
     let flag = false;
@@ -26,47 +26,14 @@ function toTiles(image: string[]) {
   return tiles;
 }
 
-/*
-tilesToPolygons([
-  [{ beginX: 0, endX: 3 }]
-, [{ beginX: 0, endX: 1 }, { beginX: 2, endX: 3 }]
-, [{ beginX: 0, endX: 3 }]
-]).forEach(p => traverse(p));
-*/
-
-/*
-tilesToPolygons([
-  [{ beginX: 0, endX: 3 }, { beginX: 4, endX: 7 } ]
-, [{ beginX: 0, endX: 1 }, { beginX: 2, endX: 5 }, { beginX: 6, endX: 7 } ]
-, [{ beginX: 0, endX: 3 }, { beginX: 4, endX: 7 } ]
-]).forEach(traverse);
-*/
-
 tilesToPolygons(toTiles([
-  '## ### ##'
-, '# # # # #'
+  ' #     # '
+, '###   ###'
 , ' ### ### '
-, '# # # # #'
-, '## ### ##'
-, '# # # # #'
+, '  ## ##  '
+, '    #    '
+, '  ## ##  '
 , ' ### ### '
-, '# # # # #'
-, '## ### ##'
+, '###   ###'
+, ' #     # '
 ])).forEach(traverse);
-
-/*
-tilesToPolygons(toTiles([
-  '#####'
-, '# # #'
-, '## ##'
-, '# # #'
-, '#####'
-])).forEach(traverse);
-*/
-
-/*
-tilesToPolygons([
-  [{ beginX: 0, endX: 3 }, { beginX: 4, endX: 7 }]
-, [{ beginX: 0, endX: 1 }, { beginX: 2, endX: 5 }]
-]).forEach(p => traverse(p));
-*/

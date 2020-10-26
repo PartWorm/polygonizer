@@ -89,7 +89,7 @@ function createBottomTile(groupRoots: Set<PointGroup>, y: number, beginX: number
   return new BottomTile(begin, end);
 }
 
-export function tilesToPolygons(rows: Tile[][]) {
+export function tilesToPolygons(rows: Iterable<Iterable<Tile>>) {
   const pointGroupRoots = new Set<PointGroup>();
   let topTiles: TopTile[] = [];
   let y = -1;
@@ -119,7 +119,7 @@ export function tilesToPolygons(rows: Tile[][]) {
         bottomTiles.shift();
       }
     }
-    topTiles = [...nextTopTiles.map(t => t.toTopTile())].sort((a, b) => a.end.x - b.end.x);
+    topTiles = nextTopTiles.map(t => t.toTopTile());
     ++y;
   }
   return Array.from(pointGroupRoots).map(g => g.anyPoint);
