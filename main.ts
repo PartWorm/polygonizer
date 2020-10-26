@@ -9,7 +9,7 @@ class PointGroup {
     const r1 = g1.root(), r2 = g2.root();
     roots.delete(r1);
     roots.delete(r2);
-    const root = new PointGroup(roots, r1.anyPoint);
+    const root = new PointGroup(roots, r2.anyPoint);
     r1.parent = root;
     r2.parent = root;
   }
@@ -50,6 +50,10 @@ class TopTile {
   }
 
   merge(pointGroupRoots: Set<PointGroup>, t: BottomTile) {
+    console.log('Merging');
+    traverse(this.begin);
+    console.log('With');
+    traverse(t.begin);
     this.begin.next = t.begin;
     t.end.next = this.end;
     if (this.begin.group.root() == t.begin.group.root()) {
@@ -64,9 +68,11 @@ class TopTile {
     }
     else if (this.begin.x < t.begin.x) {
       result = new BottomTile(t.begin, this.begin);
-      this.end = this.begin;
-      this.begin = t.begin;
     }
+    console.log('Becaming');
+    traverse(this.begin);
+    console.log('Merge end');
+    console.log('');
     return result;
   }
 }
@@ -84,9 +90,9 @@ function createBottomTile(groupRoots: Set<PointGroup>, y: number, beginX: number
   const group = new PointGroup(groupRoots, null);
   const begin = new Point(group, endX, y);
   const end = new Point(group, beginX, y);
-  group.anyPoint = begin;
   end.next = begin;
   begin.next = new Point(group, endX, y + 1, new Point(group, beginX, y + 1, end));
+  group.anyPoint = begin;
   return new BottomTile(begin, end);
 }
 
@@ -238,13 +244,24 @@ tilesToPolygons([
 */
 
 tilesToPolygons(toTiles([
-  ' # #'
-, '#####'
-, '# # #'
+  '#######'
+, '# # # #'
+, '##   ##'
+, '#     #'
+, '##   ##'
+, '# # # #'
+, '#######'
+])).forEach(traverse);
+
+/*
+tilesToPolygons(toTiles([
+  '#####'
 , '# # #'
 , '## ##'
-, ' # #'
+, '# # #'
+, '#####'
 ])).forEach(traverse);
+*/
 
 /*
 tilesToPolygons([
