@@ -6,8 +6,7 @@ class PointGroup {
 
   private parent: PointGroup;
 
-  static merge(g1: PointGroup, g2: PointGroup) {
-    const roots = g1.roots;
+  static merge(roots: Set<PointGroup>, g1: PointGroup, g2: PointGroup) {
     const r1 = g1.root(), r2 = g2.root();
     roots.delete(r1);
     roots.delete(r2);
@@ -16,7 +15,7 @@ class PointGroup {
     r2.parent = root;
   }
 
-  constructor(private roots: Set<PointGroup>, public anyPoint: GroupedPoint) {
+  constructor(roots: Set<PointGroup>, public anyPoint: GroupedPoint) {
     roots.add(this);
   }
 
@@ -58,7 +57,7 @@ class TopTile {
       this.end.fork(pointGroupRoots);
     }
     else {
-      PointGroup.merge(this.begin.group, t.begin.group);
+      PointGroup.merge(pointGroupRoots, this.begin.group, t.begin.group);
     }
     let result: BottomTile;
     if (this.begin.x > t.begin.x) {
