@@ -1,126 +1,150 @@
-import { Point } from './Point';
+import { make_point, Point } from './Point';
 
-export type Tile = { beginX: number, endX: number };
+export type Tile = { begin_x: number, end_x: number };
 
-class PointGroup {
+class Group {
 
-  private parent: PointGroup;
+	public point: Point;
 
-  static merge(roots: Set<PointGroup>, g1: PointGroup, g2: PointGroup) {
-    const r1 = g1.root(), r2 = g2.root();
-    roots.delete(r1);
-    roots.delete(r2);
-    const root = new PointGroup(roots, r2.anyPoint);
-    r1.parent = root;
-    r2.parent = root;
-  }
+	private refs = new Set<MergeableEdge>();
 
-  constructor(roots: Set<PointGroup>, public anyPoint: GroupedPoint) {
-    roots.add(this);
-  }
+	add(ref: MergeableEdge) {
+		this.refs.add(ref);
+	}
 
-  root() {
-    let here: PointGroup = this;
-    while (here.parent) {
-      here = here.parent;
-    }
-    return here;
-  }
+	delete(pool: Group[], ref: MergeableEdge) {
+		this.refs.delete(ref);
+		if (this.refs.size == 0) {
+			this.refs.clear();
+			pool.push(this);
+		}
+	}
+
+	merge_into(pool: Group[], group: Group) {
+		for (const r of this.refs) {
+			r.group = group;
+			group.add(r);
+		}
+		this.refs.clear();
+		pool.push(this);
+	}
+
+	size() {
+		return this.refs.size;
+	}
+
 }
 
-class GroupedPoint implements Point {
+class MergeableEdge {
 
-  constructor(public group: PointGroup, public x: number, public y: number, public next: GroupedPoint) {}
+	constructor(public group: Group, public begin: Point, public end: Point) {
+		group.add(this);
+	}
 
-  fork(groupRoots: Set<PointGroup>) {
-    const group = new PointGroup(groupRoots, this);
-    let here: GroupedPoint = this;
-    do {
-      here.group = group;
-      here = here.next;
-    } while (here != this);
-  }
+	overlaps(e: MergeableEdge) {
+		return e.end.x < this.begin.x && e.begin.x > this.end.x;
+	}
+
+	deref(group_pool: Group[]) {
+		this.group.delete(group_pool, this);
+	}
+
+	merge(polygons: Set<Point>, group_pool: Group[], e: MergeableEdge) {
+		this.begin.next = e.begin;
+		e.end.next = this.end;
+		if (this.group == e.group) {
+			polygons.add(this.end);
+		}
+		else if (this.group.size() >= e.group.size()) {
+			polygons.delete(this.group.point);
+			this.group.point = e.group.point;
+			e.group.merge_into(group_pool, this.group);
+		}
+		else {
+			polygons.delete(this.group.point);
+			this.group.merge_into(group_pool, e.group);
+		}
+		if (this.begin.x >= e.begin.x) {
+			this.end = e.begin;
+		}
+		else {
+			e.end = this.begin;
+			this.deref(group_pool);
+			return true;
+		}
+		return false;
+	}
+
+	to_top() {
+		this.begin = this.begin.next;
+		this.end = this.begin.next;
+	}
+
 }
 
-class TopTile {
+const create_bottom_edge = (polygons: Set<Point>, pool: Group[], y: number, begin_x: number, end_x: number) => {
+	const end = make_point(begin_x, y, null as unknown as Point);
+	const begin =
+		make_point(end_x, y,
+		make_point(end_x, y + 1,
+		make_point(begin_x, y + 1, end)));
+	end.next = begin;
+	const group = pool.pop() || new Group();
+	group.point = begin.next;
+	polygons.add(begin.next);
+	return new MergeableEdge(group, begin, end);
+};
 
-  constructor(public begin: GroupedPoint, public end: GroupedPoint) {}
+const cleanup = (p: Point) => {
+	let here = p;
+	do {
+		while (here.next != p && here.x == here.next.x && here.x == here.next.next.x) {
+			here.next = here.next.next;
+		}
+		here = here.next;
+	} while (here != p);
+};
 
-  collides(t: BottomTile) {
-    return t.end.x < this.begin.x && t.begin.x > this.end.x;
-  }
-
-  merge(pointGroupRoots: Set<PointGroup>, t: BottomTile) {
-    this.begin.next = t.begin;
-    t.end.next = this.end;
-    if (this.begin.group.root() == t.begin.group.root()) {
-      this.end.fork(pointGroupRoots);
-    }
-    else {
-      PointGroup.merge(pointGroupRoots, this.begin.group, t.begin.group);
-    }
-    let result: BottomTile;
-    if (this.begin.x > t.begin.x) {
-      this.end = t.begin;
-    }
-    else if (this.begin.x < t.begin.x) {
-      result = new BottomTile(t.begin, this.begin);
-    }
-    return result;
-  }
-}
-
-class BottomTile {
-
-  constructor(public begin: GroupedPoint, public end: GroupedPoint) {}
-
-  toTopTile() {
-    return new TopTile(this.begin.next, this.begin.next.next);
-  }
-}
-
-function createBottomTile(groupRoots: Set<PointGroup>, y: number, beginX: number, endX: number): BottomTile {
-  const group = new PointGroup(groupRoots, null);
-  const begin = new GroupedPoint(group, endX, y, null);
-  const end = new GroupedPoint(group, beginX, y, null);
-  end.next = begin;
-  begin.next = new GroupedPoint(group, endX, y + 1, new GroupedPoint(group, beginX, y + 1, end));
-  group.anyPoint = begin;
-  return new BottomTile(begin, end);
-}
-
-export function tilesToPolygons(rows: Iterable<Iterable<Tile>>) {
-  const pointGroupRoots = new Set<PointGroup>();
-  let topTiles: TopTile[] = [];
-  let y = -1;
-  for (const row of rows) {
-    const nextTopTiles: BottomTile[] = [];
-    const bottomTiles: BottomTile[] = [];
-    for (const tile of row) {
-      const t = createBottomTile(pointGroupRoots, y + 1, tile.beginX, tile.endX);
-      bottomTiles.push(t);
-      nextTopTiles.push(t);
-    }
-    while (topTiles.length > 0 && bottomTiles.length > 0) {
-      if (topTiles[0].collides(bottomTiles[0])) {
-        const result = topTiles[0].merge(pointGroupRoots, bottomTiles[0]);
-        if (result === undefined) {
-          bottomTiles.shift();
-        }
-        else {
-          topTiles.shift();
-          bottomTiles[0] = result;
-        }
-      }
-      else if (topTiles[0].end.x < bottomTiles[0].end.x) {
-        topTiles.shift();
-      }
-      else {
-        bottomTiles.shift();
-      }
-    }
-    topTiles = nextTopTiles.map(t => t.toTopTile());
-    ++y;
-  }
-  return Array.from(pointGroupRoots).map(g => g.anyPoint);
-}
+export const polygonize = (rows: Iterable<Iterable<Tile>>) => {
+	const polygons = new Set<Point>();
+	const group_pool: Group[] = [];
+	let top_edges: MergeableEdge[] = [];
+	let y = 0;
+	for (const row of rows) {
+		const next_top_edges: MergeableEdge[] = [];
+		const bottom_edges: MergeableEdge[] = [];
+		for (const tile of row) {
+			const t = create_bottom_edge(polygons, group_pool, y, tile.begin_x, tile.end_x);
+			bottom_edges.push(t);
+		}
+		let i = 0, j = 0;
+		while (i < top_edges.length && j < bottom_edges.length) {
+			if (top_edges[i].overlaps(bottom_edges[j])) {
+				if (top_edges[i].merge(polygons, group_pool, bottom_edges[j])) {
+					++i;
+				}
+				else {
+					next_top_edges.push(bottom_edges[j++]);
+				}
+			}
+			else if (top_edges[i].end.x < bottom_edges[j].end.x) {
+				top_edges[i++].deref(group_pool);
+			}
+			else {
+				next_top_edges.push(bottom_edges[j++]);
+			}
+		}
+		while (i < top_edges.length) {
+			top_edges[i++].deref(group_pool);
+		}
+		while (j < bottom_edges.length) {
+			next_top_edges.push(bottom_edges[j++]);
+		}
+		for (const t of next_top_edges) {
+			t.to_top();
+		}
+		top_edges = next_top_edges;
+		++y;
+	}
+	return Array.from(polygons).map(p => (cleanup(p), p));
+};
