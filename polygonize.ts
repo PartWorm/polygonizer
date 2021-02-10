@@ -86,8 +86,8 @@ const create_bottom_edge = (polygons: Set<Point>, pool: Group[], y: number, begi
 	const end = make_point(begin_x, y, null as unknown as Point);
 	const begin =
 		make_point(end_x, y,
-		make_point(end_x, y + 1,
-		make_point(begin_x, y + 1, end)));
+			make_point(end_x, y + 1,
+				make_point(begin_x, y + 1, end)));
 	end.next = begin;
 	const group = pool.pop() || new Group();
 	group.point = begin.next;
